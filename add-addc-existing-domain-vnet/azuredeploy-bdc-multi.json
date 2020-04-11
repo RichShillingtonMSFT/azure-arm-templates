@@ -1,0 +1,256 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "virtualMachineNames":{
+            "type": "array",
+            "metadata": {
+                "description": "List of comma-separated VM names."
+            }
+        },
+        "adminUsername": {
+            "type": "string",
+            "metadata": {
+                "description": "The name of the Administrator of the new VM and Domain"
+            }
+        },
+        "adminPassword": {
+            "type": "securestring",
+            "metadata": {
+                "description": "The password for the Administrator account of the new VM and Domain"
+            }
+        },
+        "domainName": {
+            "type": "string",
+            "metadata": {
+                "description": "The FQDN of the AD Domain created "
+            }
+        },
+        "storageAccountType":{
+            "type":"string",
+            "metadata": {
+                "description": "Storage Account Type. Allowed Values are Premium_LRS ,Standard_LRS"
+            },
+            "allowedValues":[
+                "Premium_LRS",
+                "Standard_LRS"
+            ]
+        },
+        "imagePublisher":{
+            "type":"string",
+            "metadata": {
+                "description": "Image Publisher. Example: MicrosoftWindowsServer"
+            }
+        },
+        "imageOffer":{
+            "type":"string",
+            "metadata": {
+                "description": "Image Offer. Example: WindowsServer"
+            }
+        },
+        "imageSKU":{
+            "type":"string",
+            "metadata": {
+                "description": "Image SKU. Example: 2016-Datacenter"
+            }
+        },
+        "imageVersion":{
+            "type":"string",
+            "metadata": {
+                "description": "Image Version. Example: latest"
+            }
+        },
+        "virtualMachineSize":{
+            "type":"string",
+            "metadata": {
+                "description": "Size of the VM. Example: Standard_DS2_v2"
+            }
+        },
+        "virtualNetworkResourceGroup": {
+            "type": "string",
+            "metadata": {
+                "description": "Name of the Resource Group containing the Virtual Network"
+            }
+        },
+        "virtualNetworkName": {
+            "type": "string",
+            "metadata": {
+                "description": "Name of the the Virtual Network"
+            }
+        },
+        "subnetName": {
+            "type": "string",
+            "metadata": {
+                "description": "Name of the the Subnet in the Virtual Network"
+            }
+        },
+        "availabilitySetName": {
+            "type": "string",
+            "metadata": {
+                "description": "Name of the the Availability Set"
+            }
+        },
+        "dataDiskSize":{
+            "type":"int",
+            "metadata": {
+                "description": "Size of the data disk in MB"
+            }
+        },
+        "_artifactsLocation": {
+            "type": "string",
+            "metadata": {
+                "description": "The location of resources, such as templates and DSC modules, that the template depends on"
+            }
+        },
+        "_artifactsLocationSasToken": {
+            "type": "securestring",
+            "metadata": {
+                "description": "Auto-generated token to access _artifactsLocation"
+            }
+        },
+        "location": {
+            "type": "string",
+            "defaultValue": "[resourceGroup().location]",
+            "metadata": {
+                "description": "Location for all resources."
+            }
+        },
+        "pdcIPAddress":{
+            "type":"string",
+            "metadata": {
+                "description": "IP Address of the PDC"
+            }
+        }
+    },
+    "variables": {
+        "adBDCPreparationModulesURL": "[concat(parameters('_artifactsLocation'),'DSC/PrepareADBDC.zip', parameters('_artifactsLocationSasToken'))]",
+        "adBDCConfigurationModulesURL": "[concat(parameters('_artifactsLocation'),'DSC/ConfigureADBDC.zip', parameters('_artifactsLocationSasToken'))]",
+        "configureADBDCTemplateUri": "[concat(parameters('_artifactsLocation'),'nestedtemplates/configureADBDC.json', parameters('_artifactsLocationSasToken'))]",
+        "virtualMachineTemplateUri": "[concat(parameters('_artifactsLocation'),'nestedtemplates/azuredeploy-bdc-multi-template.json', parameters('_artifactsLocationSasToken'))]",
+        "staticIPTemplateUri": "[concat(parameters('_artifactsLocation'),'nestedtemplates/linkedstaticip.json', parameters('_artifactsLocationSasToken'))]",
+        "diagnosticsStorageAccountType":"Standard_LRS",
+        "diagnosticsStorageAccountName": "[concat('vmdiag', uniquestring(resourceGroup().id))]",
+        "apiVersions":{
+            "resourcesDeploymentsAPIVersion":"[providers('Microsoft.Resources','deployments').apiVersions[0]]",
+            "storageAccountsAPIVersion":"[providers('Microsoft.Storage','storageAccounts').apiVersions[0]]",
+            "availabilitySetsAPIVersion":"[providers('Microsoft.Compute','availabilitySets').apiVersions[0]]",
+            "virtualMachinesExtensionsAPIVersion":"[providers('Microsoft.Compute','virtualMachines/extensions').apiVersions[0]]",
+            "networkInterfacesAPIVersion":"[providers('Microsoft.Network','networkInterfaces').apiVersions[0]]",
+            "virtualMachinesAPIVersion":"[providers('Microsoft.Compute','virtualMachines').apiVersions[0]]"
+        }
+    },
+    "resources": [
+        {
+            "apiVersion": "[variables('apiVersions').availabilitySetsAPIVersion]",
+            "type": "Microsoft.Compute/availabilitySets",
+            "location": "[parameters('location')]",
+            "name": "[parameters('availabilitySetName')]",
+            "properties": {
+                "PlatformUpdateDomainCount": 5,
+                "PlatformFaultDomainCount": 2
+            },
+            "sku": {
+                "name": "Aligned"
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "apiVersion": "[variables('apiVersions').storageAccountsAPIVersion]",
+            "name": "[variables('diagnosticsStorageAccountName')]",
+            "location": "[parameters('location')]",
+            "sku": {
+                "name": "[variables('diagnosticsStorageAccountType')]"
+            },
+            "kind": "StorageV2",
+            "properties": {}
+        },
+        {
+            "name": "[concat('linkedTemplate', copyIndex())]",
+            "copy": {
+                "name": "virtualMachineCopy",
+                "count": "[length(parameters('virtualMachineNames'))]"
+            },
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "[variables('apiVersions').resourcesDeploymentsAPIVersion]",
+            "dependsOn":[
+                "[resourceId('Microsoft.Storage/storageAccounts/', variables('diagnosticsStorageAccountName'))]",
+                "[resourceId('Microsoft.Compute/availabilitySets', parameters('availabilitySetName'))]"
+            ],
+            "properties": {
+                "mode": "Incremental",
+                "templateLink": {
+                    "uri": "[variables('virtualMachineTemplateUri')]"
+                },
+                "parameters": {
+                    "virtualMachineName":{
+                        "value":"[parameters('virtualMachineNames')[copyIndex()]]"
+                    },
+                    "adminUsername": {
+                        "value":"[parameters('adminUsername')]"
+                    },
+                    "adminPassword": {
+                        "value":"[parameters('adminPassword')]"
+                    },
+                    "domainName": {
+                        "value":"[parameters('domainName')]"
+                    },
+                    "storageAccountType":{
+                        "value":"[parameters('storageAccountType')]"
+                    },
+                    "imagePublisher":{
+                        "value":"[parameters('imagePublisher')]"
+                    },
+                    "imageOffer":{
+                        "value":"[parameters('imageOffer')]"
+                    },
+                    "imageSKU":{
+                        "value":"[parameters('imageSKU')]"
+                    },
+                    "imageVersion":{
+                        "value":"[parameters('imageVersion')]"
+                    },
+                    "virtualMachineSize":{
+                        "value":"[parameters('virtualMachineSize')]"
+                    },
+                    "virtualNetworkResourceGroup": {
+                        "value":"[parameters('virtualNetworkResourceGroup')]"
+                    },
+                    "virtualNetworkName": {
+                        "value":"[parameters('virtualNetworkName')]"
+                    },
+                    "subnetName": {
+                        "value":"[parameters('subnetName')]"
+                    },
+                    "availabilitySetName": {
+                        "value":"[parameters('availabilitySetName')]"
+                    },
+                    "dataDiskSize":{
+                        "value":"[parameters('dataDiskSize')]"
+                    },
+                    "location": {
+                        "value":"[parameters('location')]"
+                    },
+                    "pdcIPAddress":{
+                        "value":"[parameters('pdcIPAddress')]"
+                    },
+                    "staticIPTemplateUri": {
+                        "value": "[variables('staticIPTemplateUri')]"
+                    },
+                    "adBDCPreparationModulesURL":{
+                        "value":"[variables('adBDCPreparationModulesURL')]"
+                    },
+                    "adBDCConfigurationModulesURL":{
+                        "value":"[variables('adBDCConfigurationModulesURL')]"
+                    },
+                    "configureADBDCTemplateUri":{
+                        "value":"[variables('configureADBDCTemplateUri')]"
+                    },
+                    "storageAccountURI":{
+                        "value":"[reference(resourceId('Microsoft.Storage/storageAccounts/', variables('diagnosticsStorageAccountName'))).primaryEndpoints.blob]"
+                    }    
+                }
+            }
+        }
+    ],  
+    "outputs": {}
+}

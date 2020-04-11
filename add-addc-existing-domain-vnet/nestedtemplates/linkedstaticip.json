@@ -1,0 +1,55 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "nicName": {
+            "type": "string"
+        },
+        "subnetReference": {
+            "type": "string"
+        },
+        "privateIp": {
+            "type": "string"
+        },
+        "location": {
+            "type": "string",
+            "defaultValue": "[resourceGroup().location]",
+            "metadata": {
+                "description": "Location for all resources."
+            }
+        }
+    },
+    "variables": {
+        "apiVersions":{
+            "resourcesDeploymentsAPIVersion":"[providers('Microsoft.Resources','deployments').apiVersions[0]]",
+            "storageAccountsAPIVersion":"[providers('Microsoft.Storage','storageAccounts').apiVersions[0]]",
+            "availabilitySetsAPIVersion":"[providers('Microsoft.Compute','availabilitySets').apiVersions[0]]",
+            "virtualMachinesExtensionsAPIVersion":"[providers('Microsoft.Compute','virtualMachines/extensions').apiVersions[0]]",
+            "networkInterfacesAPIVersion":"[providers('Microsoft.Network','networkInterfaces').apiVersions[0]]",
+            "virtualMachinesAPIVersion":"[providers('Microsoft.Compute','virtualMachines').apiVersions[0]]"
+        }
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Network/networkInterfaces",
+            "name": "[parameters('nicName')]",
+            "apiVersion": "[variables('apiVersions').networkInterfacesAPIVersion]",
+            "location": "[parameters('location')]",
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "privateIPAllocationMethod": "Static",
+                            "privateIPAddress": "[parameters('privateIp')]",
+                            "subnet": {
+                                "id": "[parameters('subnetReference')]"
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+    ],
+    "outputs": {}
+}

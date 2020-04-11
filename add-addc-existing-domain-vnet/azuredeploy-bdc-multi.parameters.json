@@ -1,0 +1,93 @@
+{
+  "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "virtualMachineNames":{
+        "metadata": {
+            "description": "List of comma-separated VM names."
+        },
+        "value":[
+            "AD-03",
+            "AD-04"
+        ]
+    },
+    "adminUsername": {
+        "metadata": {
+            "description": "The username for the Administrator Account"
+        },
+        "value": "adAdministrator"
+    },
+    "domainName": {
+        "metadata": {
+            "description": "The FQDN of the AD Domain created "
+        },
+        "value":"contoso.local"
+    },
+    "storageAccountType":{
+        "metadata": {
+            "description": "Storage Account Type. Allowed Values are Premium_LRS ,Standard_LRS"
+        },
+        "value":"Standard_LRS"
+    },
+    "imagePublisher":{
+        "metadata": {
+            "description": "Image Publisher. Example: MicrosoftWindowsServer"
+        },
+        "value":"MicrosoftWindowsServer"
+    },
+    "imageOffer":{
+        "metadata": {
+            "description": "Image Offer. Example: WindowsServer"
+        },
+        "value":"WindowsServer"
+    },
+    "imageSKU":{
+        "metadata": {
+            "description": "Image SKU. Example: 2016-Datacenter"
+        },
+        "value":"2016-Datacenter"
+    },
+    "imageVersion":{
+        "metadata": {
+            "description": "Image Version. Example: latest"
+        },
+        "value":"latest"
+    },
+    "virtualMachineSize":{
+        "metadata": {
+            "description": "Size of the VM. Example: Standard_DS2_v2"
+        },
+        "value":"Standard_DS2_v2"
+    },
+    "virtualNetworkResourceGroup": {
+        "metadata": {
+            "description": "Name of the Resource Group containing the Virtual Network"
+        },
+        "value": "Network-RG"
+    },
+    "virtualNetworkName": {
+        "metadata": {
+            "description": "Name of the the Virtual Network"
+        },
+        "value": "Prod-VNet"
+    },
+    "subnetName": {
+        "metadata": {
+            "description": "Name of the the Subnet in the Virtual Network"
+        },
+        "value": "AD-Subnet"
+    },
+    "availabilitySetName": {
+        "metadata": {
+            "description": "Name of the the Availability Set"
+        },
+        "value": "AD-AS"
+    },
+    "dataDiskSize":{
+        "metadata": {
+            "description": "Size of the data disk in MB"
+        },
+        "value": 1024
+    }
+  }
+}

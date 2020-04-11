@@ -1,0 +1,318 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "virtualMachineName":{
+            "type":"string",
+            "metadata": {
+                "description": "The name for the VM"
+            }
+        },
+        "adminUsername": {
+            "type": "string",
+            "metadata": {
+                "description": "The name of the Administrator of the new VM and Domain"
+            }
+        },
+        "adminPassword": {
+            "type": "securestring",
+            "metadata": {
+                "description": "The password for the Administrator account of the new VM and Domain"
+            }
+        },
+        "domainName": {
+            "type": "string",
+            "metadata": {
+                "description": "The FQDN of the AD Domain created "
+            }
+        },
+        "storageAccountType":{
+            "type":"string",
+            "metadata": {
+                "description": "Storage Account Type. Allowed Values are Premium_LRS ,Standard_LRS"
+            },
+            "allowedValues":[
+                "Premium_LRS",
+                "Standard_LRS"
+            ]
+        },
+        "imagePublisher":{
+            "type":"string",
+            "metadata": {
+                "description": "Image Publisher. Example: MicrosoftWindowsServer"
+            }
+        },
+        "imageOffer":{
+            "type":"string",
+            "metadata": {
+                "description": "Image Offer. Example: WindowsServer"
+            }
+        },
+        "imageSKU":{
+            "type":"string",
+            "metadata": {
+                "description": "Image SKU. Example: 2016-Datacenter"
+            }
+        },
+        "imageVersion":{
+            "type":"string",
+            "metadata": {
+                "description": "Image Version. Example: latest"
+            }
+        },
+        "virtualMachineSize":{
+            "type":"string",
+            "metadata": {
+                "description": "Size of the VM. Example: Standard_DS2_v2"
+            }
+        },
+        "virtualNetworkResourceGroup": {
+            "type": "string",
+            "metadata": {
+                "description": "Name of the Resource Group containing the Virtual Network"
+            }
+        },
+        "virtualNetworkName": {
+            "type": "string",
+            "metadata": {
+                "description": "Name of the the Virtual Network"
+            }
+        },
+        "subnetName": {
+            "type": "string",
+            "metadata": {
+                "description": "Name of the the Subnet in the Virtual Network"
+            }
+        },
+        "availabilitySetName": {
+            "type": "string",
+            "metadata": {
+                "description": "Name of the the Availability Set"
+            }
+        },
+        "dataDiskSize":{
+            "type":"int",
+            "metadata": {
+                "description": "Size of the data disk in MB"
+            }
+        },
+        "location": {
+            "type": "string",
+            "metadata": {
+                "description": "Location for all resources."
+            }
+        },
+        "pdcIPAddress":{
+            "type":"string"
+        },
+        "staticIPTemplateUri": {
+            "type": "string"
+        },
+        "adBDCPreparationModulesURL":{
+            "type":"string"
+        },
+        "adBDCConfigurationModulesURL":{
+            "type":"string"
+        },
+        "configureADBDCTemplateUri":{
+            "type":"string"
+        },
+        "storageAccountURI":{
+            "type":"string"
+        }
+    },
+    "variables": {
+        "adBDCPreparationFunction": "PrepareADBDC.ps1\\PrepareADBDC",
+        "adBDCConfigurationFunction": "ConfigureADBDC.ps1\\ConfigureADBDC",
+        "virtualMachineNICName":"[concat(parameters('virtualMachineName'),'-NIC')]",
+        "virtualMachineVnetID": "[resourceId(parameters('virtualNetworkResourceGroup'), 'Microsoft.Network/virtualNetworks', parameters('virtualNetworkName'))]",
+        "subnetReference": "[concat(variables('virtualMachineVnetID'), '/subnets/', parameters('subnetName'))]",
+        "apiVersions":{
+            "resourcesDeploymentsAPIVersion":"[providers('Microsoft.Resources','deployments').apiVersions[0]]",
+            "storageAccountsAPIVersion":"[providers('Microsoft.Storage','storageAccounts').apiVersions[0]]",
+            "availabilitySetsAPIVersion":"[providers('Microsoft.Compute','availabilitySets').apiVersions[0]]",
+            "virtualMachinesExtensionsAPIVersion":"[providers('Microsoft.Compute','virtualMachines/extensions').apiVersions[0]]",
+            "networkInterfacesAPIVersion":"[providers('Microsoft.Network','networkInterfaces').apiVersions[0]]",
+            "virtualMachinesAPIVersion":"[providers('Microsoft.Compute','virtualMachines').apiVersions[0]]"
+        }
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Network/networkInterfaces",
+            "name": "[variables('virtualMachineNICName')]",
+            "apiVersion": "[variables('apiVersions').networkInterfacesAPIVersion]",
+            "location": "[parameters('location')]",
+            "dependsOn": [],
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "subnet": {
+                                "id": "[variables('subnetReference')]"
+                            },
+                        "privateIPAllocationMethod": "Dynamic",
+                        "primary": true,
+                        "privateIPAddressVersion": "IPv4"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "[parameters('virtualMachineName')]",
+            "type": "Microsoft.Compute/virtualMachines",
+            "apiVersion": "[variables('apiVersions').virtualMachinesAPIVersion]",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkInterfaces',variables('virtualMachineNICName'))]"
+            ],
+            "properties": {
+                "licenseType": "Windows_Server",
+                "hardwareProfile": {
+                    "vmSize": "[parameters('virtualMachineSize')]"
+                },
+                "availabilitySet": {
+                    "id": "[resourceId('Microsoft.Compute/availabilitySets', parameters('availabilitySetName'))]"
+                },
+                "osProfile": {
+                    "computerName": "[parameters('virtualMachineName')]",
+                    "adminUsername": "[parameters('adminUsername')]",
+                    "adminPassword": "[parameters('adminPassword')]"
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "publisher": "[parameters('imagePublisher')]",
+                        "offer": "[parameters('imageOffer')]",
+                        "sku": "[parameters('imageSKU')]",
+                        "version": "[parameters('imageVersion')]"
+                    },
+                    "osDisk": {
+                        "name": "[concat(parameters('virtualMachineName'),'_OSDisk')]",
+                        "caching": "ReadWrite",
+                        "createOption": "FromImage",
+                        "managedDisk": {
+                            "storageAccountType": "[parameters('storageAccountType')]"
+                        }
+                    },
+                    "dataDisks": [
+                        {
+                            "name": "[concat(parameters('virtualMachineName'),'_data-disk1')]",
+                            "caching": "None",
+                            "diskSizeGB": "[parameters('dataDiskSize')]",
+                            "lun": 0,
+                            "createOption": "Empty",
+                            "managedDisk": {
+                                "storageAccountType": "[parameters('storageAccountType')]"
+                            }
+                        }
+                    ]
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces',variables('virtualMachineNICName'))]"
+                        }
+                    ]
+                },
+                "diagnosticsProfile": {
+                    "bootDiagnostics": {
+                        "enabled": true,
+                        "storageUri": "[parameters('storageAccountURI')]"
+                    }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+            "name": "[concat(parameters('virtualMachineName'),'/PrepareBDC')]",
+            "apiVersion": "[variables('apiVersions').virtualMachinesExtensionsAPIVersion]",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[concat('Microsoft.Compute/virtualMachines/', parameters('virtualMachineName'))]",
+                "[concat(parameters('virtualMachineName'),'-updateIP')]"
+            ],
+            "properties": {
+                "publisher": "Microsoft.Powershell",
+                "type": "DSC",
+                "typeHandlerVersion": "2.19",
+                "autoUpgradeMinorVersion": true,
+                "settings": {
+                    "ModulesUrl": "[parameters('adBDCPreparationModulesURL')]",
+                    "ConfigurationFunction": "[variables('adBDCPreparationFunction')]",
+                    "Properties": {
+                        "DNSServer": "[parameters('pdcIPAddress')]"
+                    }
+                }
+            }
+        },
+        {
+            "name": "[concat(parameters('virtualMachineName'),'-ConfigBDC')]",
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "[variables('apiVersions').resourcesDeploymentsAPIVersion]",
+            "dependsOn": [
+                "[concat('Microsoft.Compute/virtualMachines/',parameters('virtualMachineName'),'/extensions/PrepareBDC')]"
+            ],
+            "properties": {
+                "mode": "Incremental",
+                "templateLink": {
+                "uri": "[parameters('configureADBDCTemplateUri')]",
+                "contentVersion": "1.0.0.0"
+                },
+                "parameters": {
+                "adBDCVMName": {
+                    "value": "[parameters('virtualMachineName')]"
+                },
+                "location": {
+                    "value": "[parameters('location')]"
+                },
+                "adminUsername": {
+                    "value": "[parameters('adminUsername')]"
+                },
+                "adminPassword": {
+                    "value": "[parameters('adminPassword')]"
+                },
+                "domainName": {
+                    "value": "[parameters('domainName')]"
+                },
+                "adBDCConfigurationFunction": {
+                    "value": "[variables('adBDCConfigurationFunction')]"
+                },
+                "adBDCConfigurationModulesURL": {
+                    "value": "[parameters('adBDCConfigurationModulesURL')]"
+                }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Resources/deployments",
+            "name": "[concat(parameters('virtualMachineName'),'-updateIP')]",
+            "apiVersion": "[variables('apiVersions').resourcesDeploymentsAPIVersion]",
+            "dependsOn": [
+                "[parameters('virtualMachineName')]"
+            ],
+            "properties": {
+                "mode": "Incremental",
+                "templateLink": {
+                "uri": "[parameters('staticIPTemplateUri')]",
+                "contentVersion": "1.0.0.0"
+                },
+                "parameters": {
+                    "nicName": {
+                        "value": "[variables('virtualMachineNICName')]"
+                    },
+                    "subnetReference": {
+                        "value": "[variables('subnetReference')]"
+                    },
+                    "privateIp": {
+                        "value": "[reference(variables('virtualMachineNICName')).ipConfigurations[0].properties.privateIPAddress]"
+                    },
+                    "location": {
+                        "value": "[parameters('location')]"
+                    }
+                }
+            }
+        }
+    ],  
+    "outputs": {}
+}
